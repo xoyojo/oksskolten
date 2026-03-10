@@ -152,12 +152,8 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
 
   // Auto-scroll
   useEffect(() => {
-    if (variant === 'full') {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    } else {
-      const el = messagesContainerRef.current
-      if (el) el.scrollTop = el.scrollHeight
-    }
+    const el = messagesContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
   }, [messages, activeTool, variant])
 
   const handleSend = () => {
@@ -219,7 +215,7 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
               </IconButton>
             </div>
             {/* messages */}
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-3">
               {messagesContent}
             </div>
             {/* input */}
@@ -276,9 +272,9 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
           </div>
         </div>
         {/* messages */}
-        <div
+          <div
           ref={messagesContainerRef}
-          className="overflow-y-auto px-4 py-3 space-y-3"
+          className="overflow-y-auto overscroll-contain px-4 py-3 space-y-3"
           style={{ maxHeight: inlineHeight != null ? `${inlineHeight}px` : '400px' }}
         >
           {messagesContent}
@@ -307,7 +303,7 @@ export function ChatPanel({ variant, chatState: externalChatState, articleId, co
         />
       )}
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overscroll-contain">
         <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
           {messagesContent}
         </div>
