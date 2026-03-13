@@ -77,6 +77,14 @@ export function allNamed<T>(sql: string, params: Record<string, unknown>) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '../..')
 
+/** Error messages from SQLite that indicate an already-applied schema change. */
+const IDEMPOTENT_ERRORS = ['duplicate column name', 'no such column', 'already exists'] as const
+
+function isIdempotentError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return IDEMPOTENT_ERRORS.some(e => msg.includes(e))
+}
+
 /**
  * Run SQL statements one-by-one, skipping ones that fail due to
  * already-applied schema changes (duplicate column, missing column, etc.).
@@ -90,9 +98,8 @@ function execSafe(sql: string, file: string) {
     try {
       db.exec(stmt)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('duplicate column name') || msg.includes('no such column')) {
-        log.warn(`Migration ${file}: skipping statement (${msg})`)
+      if (isIdempotentError(err)) {
+        log.warn(`Migration ${file}: skipping statement (${(err as Error).message})`)
       } else {
         throw err
       }
@@ -128,15 +135,10 @@ export function runMigrations() {
     try {
       db.exec(sql)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('duplicate column name')) {
-        // Column already exists from a partially-applied migration.
-        // Strip the ALTER TABLE ADD COLUMN statement and re-run the rest.
-        const remaining = sql.replace(/ALTER TABLE \w+ ADD COLUMN [^;]+;/g, '')
-        log.warn(`Migration ${file}: column already exists, running remaining statements`)
-        execSafe(remaining, file)
-      } else if (msg.includes('no such column')) {
-        log.warn(`Migration ${file}: column already dropped, running safe statements`)
+      if (isIdempotentError(err)) {
+        // Partially-applied migration — run each statement individually,
+        // skipping ones that conflict with existing schema.
+        log.warn(`Migration ${file}: partial conflict (${(err as Error).message}), applying statement-by-statement`)
         execSafe(sql, file)
       } else {
         throw err

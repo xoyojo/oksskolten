@@ -14,20 +14,21 @@ function toAnthropicMessages(messages: import('./types.js').Message[]): Anthropi
 }
 
 function toNeutralContent(blocks: Anthropic.ContentBlock[]): ContentBlock[] {
-  return blocks.map(block => {
+  const result: ContentBlock[] = []
+  for (const block of blocks) {
     if (block.type === 'text') {
-      return { type: 'text' as const, text: block.text }
-    }
-    if (block.type === 'tool_use') {
-      return {
+      result.push({ type: 'text' as const, text: block.text })
+    } else if (block.type === 'tool_use') {
+      result.push({
         type: 'tool_use' as const,
         id: block.id,
         name: block.name,
         input: block.input as Record<string, unknown>,
-      }
+      })
     }
-    return block as unknown as ContentBlock
-  })
+    // Skip unsupported block types (thinking, etc.)
+  }
+  return result
 }
 
 export async function runAnthropicTurn(params: ChatTurnParams): Promise<RunChatTurnResult> {

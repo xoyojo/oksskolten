@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ChatSSEEvent } from './adapter.js'
+import type { ContentBlock, ToolResultBlock } from './types.js'
 import type { ProviderCallFn } from './tool-loop.js'
 
 // Mock executeTool
@@ -10,7 +11,7 @@ vi.mock('./tools.js', () => ({
 import { runToolLoop } from './tool-loop.js'
 import { executeTool } from './tools.js'
 
-function makeProvider(rounds: Array<{ content: any[]; usage?: { input_tokens: number; output_tokens: number } }>): ProviderCallFn {
+function makeProvider(rounds: Array<{ content: ContentBlock[]; usage?: { input_tokens: number; output_tokens: number } }>): ProviderCallFn {
   let callIdx = 0
   return async () => {
     const round = rounds[callIdx++] ?? rounds[rounds.length - 1]
@@ -112,16 +113,17 @@ describe('runToolLoop', () => {
       m => m.role === 'user' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_result'),
     )
     expect(toolResultMsg).toBeDefined()
-    const toolResults = (toolResultMsg!.content as any[]).filter((c: any) => c.type === 'tool_result')
+    const blocks = toolResultMsg!.content as ContentBlock[]
+    const toolResults = blocks.filter((c): c is ToolResultBlock => c.type === 'tool_result')
 
     // search_articles should have error
-    const errorResult = toolResults.find((r: any) => r.tool_use_id === 'tool_1')
-    expect(errorResult.is_error).toBe(true)
-    expect(JSON.parse(errorResult.content).error).toBe('DB error')
+    const errorResult = toolResults.find(r => r.tool_use_id === 'tool_1')
+    expect(errorResult!.is_error).toBe(true)
+    expect(JSON.parse(errorResult!.content).error).toBe('DB error')
 
     // get_feeds should succeed
-    const successResult = toolResults.find((r: any) => r.tool_use_id === 'tool_2')
-    expect(successResult.is_error).toBeUndefined()
+    const successResult = toolResults.find(r => r.tool_use_id === 'tool_2')
+    expect(successResult!.is_error).toBeUndefined()
 
     // Should complete normally
     expect(events.some(e => e.type === 'done')).toBe(true)
@@ -153,7 +155,8 @@ describe('runToolLoop', () => {
     const toolResultMsg = result.allMessages.find(
       m => m.role === 'user' && Array.isArray(m.content) && m.content.some(c => c.type === 'tool_result'),
     )
-    const toolResults = (toolResultMsg!.content as any[]).filter((c: any) => c.type === 'tool_result')
+    const blocks2 = toolResultMsg!.content as ContentBlock[]
+    const toolResults = blocks2.filter((c): c is ToolResultBlock => c.type === 'tool_result')
 
     // Order should match original tool_use order, not completion order
     expect(toolResults[0].tool_use_id).toBe('id_a')

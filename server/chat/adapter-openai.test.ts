@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ChatSSEEvent } from './adapter.js'
+import type { ContentBlock, ToolResultBlock } from './types.js'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { upsertSetting } from '../db.js'
 
@@ -13,7 +15,7 @@ vi.mock('./tools.js', () => ({
   executeTool: (...args: unknown[]) => mockExecuteTool(...args),
 }))
 
-function createMockStream(chunks: any[]) {
+function createMockStream(chunks: Record<string, unknown>[]) {
   return {
     [Symbol.asyncIterator]: async function* () {
       for (const chunk of chunks) yield chunk
@@ -81,7 +83,7 @@ describe('runOpenAITurn', () => {
       { choices: [{ delta: { content: 'world!' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 5 } },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runOpenAITurn } = await loadModule()
     const result = await runOpenAITurn({
       messages: [{ role: 'user', content: 'hi' }],
@@ -139,7 +141,7 @@ describe('runOpenAITurn', () => {
       { choices: [{ delta: { content: 'Found an article.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 25, completion_tokens: 10 } },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runOpenAITurn } = await loadModule()
     const result = await runOpenAITurn({
       messages: [{ role: 'user', content: 'search for test' }],
@@ -183,7 +185,7 @@ describe('runOpenAITurn', () => {
       { choices: [{ delta: { content: 'Error occurred.' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runOpenAITurn } = await loadModule()
     const result = await runOpenAITurn({
       messages: [{ role: 'user', content: 'search' }],
@@ -194,11 +196,12 @@ describe('runOpenAITurn', () => {
 
     // Check tool result in messages contains error
     const toolResultMsg = result.allMessages.find(
-      m => m.role === 'user' && Array.isArray(m.content) && (m.content as any[]).some(b => b.type === 'tool_result'),
+      m => m.role === 'user' && Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result'),
     )
-    const toolResult = (toolResultMsg!.content as any[]).find(b => b.type === 'tool_result')
-    expect(toolResult.is_error).toBe(true)
-    expect(toolResult.content).toContain('Database connection lost')
+    const blocks = toolResultMsg!.content as ContentBlock[]
+    const toolResult = blocks.find((b): b is ToolResultBlock => b.type === 'tool_result')
+    expect(toolResult!.is_error).toBe(true)
+    expect(toolResult!.content).toContain('Database connection lost')
   })
 
   it('emits error on max rounds exceeded', async () => {
@@ -224,7 +227,7 @@ describe('runOpenAITurn', () => {
 
     mockExecuteTool.mockResolvedValue('{}')
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runOpenAITurn } = await loadModule()
     await runOpenAITurn({
       messages: [{ role: 'user', content: 'loop' }],
@@ -310,7 +313,7 @@ describe('runOpenAITurn', () => {
       { choices: [{ delta: { content: 'done' }, finish_reason: 'stop' }], usage: null },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runOpenAITurn } = await loadModule()
     await runOpenAITurn({
       messages: [{ role: 'user', content: 'search' }],
@@ -378,7 +381,7 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
         {
           role: 'user',
           content: [
-            { type: 'tool_result', tool_use_id: 'tu_1', content: '[]' } as any,
+            { type: 'tool_result' as const, tool_use_id: 'tu_1', content: '[]' } as ToolResultBlock,
           ],
         },
       ],
@@ -417,7 +420,7 @@ describe('OpenAI message conversion (via runOpenAITurn)', () => {
         {
           role: 'user',
           content: [
-            { type: 'tool_result', tool_use_id: 'tu_1', content: '[]' } as any,
+            { type: 'tool_result' as const, tool_use_id: 'tu_1', content: '[]' } as ToolResultBlock,
           ],
         },
       ],
@@ -464,9 +467,9 @@ describe('OpenAI response to Anthropic format', () => {
 
     const lastAssistant = result.allMessages.find(m => m.role === 'assistant')
     expect(lastAssistant).toBeDefined()
-    const content = lastAssistant!.content as any[]
+    const content = lastAssistant!.content as ContentBlock[]
     expect(content[0].type).toBe('text')
-    expect(content[0].text).toBe('Hello!')
+    expect(content[0].type === 'text' && content[0].text).toBe('Hello!')
   })
 
   it('handles invalid JSON in tool call arguments gracefully', async () => {

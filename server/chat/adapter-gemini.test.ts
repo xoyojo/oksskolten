@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ChatSSEEvent } from './adapter.js'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { upsertSetting } from '../db.js'
 
@@ -13,7 +14,7 @@ vi.mock('./tools.js', () => ({
   executeTool: (...args: unknown[]) => mockExecuteTool(...args),
 }))
 
-function createMockStream(chunks: any[]) {
+function createMockStream(chunks: Record<string, unknown>[]) {
   return {
     [Symbol.asyncIterator]: async function* () {
       for (const chunk of chunks) yield chunk
@@ -79,7 +80,7 @@ describe('runGeminiTurn', () => {
       { text: 'world!', candidates: null, usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 } },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runGeminiTurn } = await loadModule()
     const result = await runGeminiTurn({
       messages: [{ role: 'user', content: 'hi' }],
@@ -120,7 +121,7 @@ describe('runGeminiTurn', () => {
       { text: 'I found an article.', candidates: null, usageMetadata: { promptTokenCount: 20, candidatesTokenCount: 8 } },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runGeminiTurn } = await loadModule()
     const result = await runGeminiTurn({
       messages: [{ role: 'user', content: 'search for test articles' }],
@@ -160,7 +161,7 @@ describe('runGeminiTurn', () => {
       { text: 'Sorry, I encountered an error.', candidates: null, usageMetadata: null },
     ]))
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runGeminiTurn } = await loadModule()
     const result = await runGeminiTurn({
       messages: [{ role: 'user', content: 'search' }],
@@ -171,12 +172,13 @@ describe('runGeminiTurn', () => {
 
     // Tool result should be marked as error
     const toolResultMsg = result.allMessages.find(
-      m => m.role === 'user' && Array.isArray(m.content) && (m.content as any[]).some(b => b.type === 'tool_result'),
+      m => m.role === 'user' && Array.isArray(m.content) && m.content.some(b => b.type === 'tool_result'),
     )
     expect(toolResultMsg).toBeDefined()
-    const toolResult = (toolResultMsg!.content as any[]).find(b => b.type === 'tool_result')
-    expect(toolResult.is_error).toBe(true)
-    expect(toolResult.content).toContain('DB error')
+    const blocks = toolResultMsg!.content as import('./types.js').ContentBlock[]
+    const toolResult = blocks.find(b => b.type === 'tool_result')
+    expect(toolResult?.type === 'tool_result' && toolResult.is_error).toBe(true)
+    expect(toolResult?.type === 'tool_result' && toolResult.content).toContain('DB error')
   })
 
   it('emits error on max rounds exceeded', async () => {
@@ -199,7 +201,7 @@ describe('runGeminiTurn', () => {
 
     mockExecuteTool.mockResolvedValue('{}')
 
-    const events: any[] = []
+    const events: ChatSSEEvent[] = []
     const { runGeminiTurn } = await loadModule()
     await runGeminiTurn({
       messages: [{ role: 'user', content: 'search' }],
@@ -267,7 +269,7 @@ describe('Gemini message conversion (via runGeminiTurn)', () => {
         {
           role: 'user',
           content: [
-            { type: 'tool_result', tool_use_id: 'tu_1', content: '[]', _tool_name: 'search_articles' } as any,
+            { type: 'tool_result' as const, tool_use_id: 'tu_1', content: '[]', _tool_name: 'search_articles' } as import('./types.js').ToolResultBlock & { _tool_name: string },
           ],
         },
       ],
