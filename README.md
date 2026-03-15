@@ -17,9 +17,15 @@
   <a href="https://github.com/babarot/oksskolten/actions/workflows/test.yaml"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/babarot/oksskolten/badges/client-coverage.json&cacheSeconds=300" alt="Client Coverage" /></a>
 </p>
 
+<p align="center">
+  <strong>Oksskolten</strong> <em>(pronounced "ooks-SKOL-ten")</em> — every article, full text, by default.
+</p>
+
 ## Why Oksskolten?
 
-Most RSS readers just show what the feed gives you — a title and maybe a summary. If you want to read the actual article, you click through to the original site. Oksskolten takes a different approach: it fetches the original article directly, extracts the full text, and stores it locally. You read everything inside Oksskolten — no need to visit the source site. This makes AI summarization and translation actually useful, because they work on the complete article, not a truncated excerpt.
+Most RSS readers show what the feed gives you — a title and maybe a summary. Some (like Miniflux and FreshRSS) can fetch full article text, but it's opt-in per feed and requires configuration. Oksskolten does it for every article automatically: it fetches the original article, extracts the full text using Mozilla's Readability + 500 noise-removal patterns, converts it to clean Markdown, and stores it locally. No per-feed toggles, no manual CSS selectors — it just works.
+
+Because Oksskolten always has the complete text, AI summarization and translation produce meaningful results, full-text search actually covers everything, and you never need to leave the app to read an article.
 
 ## See it in action
 
@@ -114,6 +120,8 @@ graph TD
 
 Everything runs in a single long-lived process — SQLite needs local disk, and node-cron needs a process that stays alive. This rules out serverless/edge runtimes but keeps the stack simple: one container, no external queues or coordination. For cloud deployment, a small VM or [Fly.io + Turso](docs/guides/deploying-to-fly-io.md) works well.
 
+> **What's in a name?** Oksskolten is the highest peak in northern Norway — a mountain of knowledge for your feeds.
+
 ### Content Pipeline
 
 Unlike traditional RSS readers that rely on feed-provided summaries, Oksskolten fetches every article directly from its source URL and extracts the full text. This means the reader is self-contained — no need to leave the app to read an article.
@@ -135,6 +143,28 @@ The feed fetcher minimizes bandwidth and adapts to each feed's behavior, inspire
 - **Adaptive scheduling** — Each feed gets its own check interval (15min–4h) based on three signals: HTTP `Cache-Control`, RSS `<ttl>`, and actual article frequency. Active blogs are checked often; dormant ones back off automatically
 - **Resilient error handling** — Exponential backoff on errors (1h–4h cap), but feeds are never disabled. Rate limits (429/503) respect `Retry-After` headers without counting as errors
 - **URL deduplication** — 60+ tracking parameters (utm_*, fbclid, gclid, etc.) are stripped before duplicate checking, preventing the same article from being inserted twice
+
+## Comparison
+
+| | Oksskolten | [Miniflux](https://github.com/miniflux/v2) | [FreshRSS](https://github.com/FreshRSS/FreshRSS) | [Feedly](https://feedly.com/) |
+|---|---|---|---|---|
+| **Full-text extraction** | Every article, by default | Opt-in per feed | Opt-in per feed | Auto (best-effort) |
+| **Extraction engine** | Readability.js + 500 patterns | Go Readability (~390 lines, ~60 rules) | Manual CSS selectors | Proprietary |
+| **JS-rendered sites** | FlareSolverr | — | — | Enterprise only |
+| **Sites without RSS** | Auto-discovery → RSS Bridge → LLM inference | — | — | Pro+ (25) / Enterprise (100) |
+| **AI summarization** | Built-in (Anthropic/Gemini/OpenAI) | — | — | Pro+ only (Leo) |
+| **AI translation** | Built-in (+ Google Translate, DeepL) | — | — | Enterprise only |
+| **AI chat** | MCP-powered, searches archive | — | — | — |
+| **Search** | Meilisearch (typo-tolerant) | PostgreSQL full-text | SQL LIKE | Pro+ (Power Search) |
+| **Database** | SQLite (embedded, WAL) | PostgreSQL (external) | MySQL/PG/SQLite | SaaS |
+| **Deployment** | Single container | Binary + PostgreSQL | PHP + web server + DB | SaaS |
+| **Offline reading** | PWA with background sync | — | — | Mobile apps only |
+| **Auth** | Password + Passkey/WebAuthn + GitHub OAuth | Password + API key | Password + API key | Google/Apple/social + SAML (Enterprise) |
+| **Themes** | 14 + custom JSON import | Light/Dark | ~10 themes | — |
+| **Language** | Node.js (TypeScript) | Go | PHP | — |
+| **Price** | Free / OSS (AGPL-3.0) | Free / OSS (Apache-2.0) | Free / OSS (AGPL-3.0) | $12.99/mo (Pro+) |
+
+Miniflux and FreshRSS are excellent, mature projects. Oksskolten's focus is different: full-text extraction and AI as first-class defaults, not optional add-ons.
 
 ## Development
 
