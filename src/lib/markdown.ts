@@ -117,6 +117,92 @@ export function fixLegacyMarkdown(md: string): string {
   return parts.join('')
 }
 
+/**
+ * Walk markdown links `[text](url)` in a string, calling `visitor` for each.
+ * The visitor receives (text, url) and returns the replacement string,
+ * or null to leave the link unchanged.
+ * Image links `![…](…)` are always skipped.
+ */
+export function walkLinks(
+  s: string,
+  visitor: (text: string, url: string) => string | null,
+): string {
+  const result: string[] = []
+  let pos = 0
+
+  while (pos < s.length) {
+    const idx = s.indexOf('[', pos)
+    if (idx === -1) {
+      result.push(s.slice(pos))
+      break
+    }
+
+    // Skip image links ![...](...) — they're fine as-is
+    if (idx > 0 && s[idx - 1] === '!') {
+      result.push(s.slice(pos, idx + 1))
+      pos = idx + 1
+      continue
+    }
+
+    // Find the matching `]` accounting for nesting depth
+    let depth = 1
+    let end = idx + 1
+    while (end < s.length && depth > 0) {
+      if (s[end] === '[') depth++
+      else if (s[end] === ']') depth--
+      if (depth > 0) end++
+    }
+
+    if (depth !== 0) {
+      result.push(s.slice(pos, idx + 1))
+      pos = idx + 1
+      continue
+    }
+
+    // end points to the closing `]` — check if followed by `(url)`
+    if (end + 1 < s.length && s[end + 1] === '(') {
+      const urlStart = end + 2
+      const urlEnd = s.indexOf(')', urlStart)
+      if (urlEnd !== -1) {
+        const text = s.slice(idx + 1, end)
+        const url = s.slice(urlStart, urlEnd)
+        const replacement = visitor(text, url)
+        if (replacement !== null) {
+          result.push(s.slice(pos, idx))
+          result.push(replacement)
+          pos = urlEnd + 1
+          continue
+        }
+      }
+    }
+
+    // Not a link or visitor declined — emit up to and including `[`
+    result.push(s.slice(pos, idx + 1))
+    pos = idx + 1
+  }
+
+  return result.join('')
+}
+
+/**
+ * Escape square brackets inside markdown link text so that titles like
+ * `[AINews] Foo` don't break `[text](url)` syntax.
+ * Fenced code blocks are preserved untouched.
+ */
+export function escapeNestedBrackets(md: string): string {
+  const parts = md.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
+  for (let i = 0; i < parts.length; i += 2) {
+    parts[i] = walkLinks(parts[i], (text, url) => {
+      if (text.includes('[') || text.includes(']')) {
+        const escaped = text.replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+        return `[${escaped}](${url})`
+      }
+      return null
+    })
+  }
+  return parts.join('')
+}
+
 export const markedInstance = new Marked(
   { gfm: true, breaks: true },
   markedHighlight({
@@ -130,3 +216,25 @@ export const markedInstance = new Marked(
     },
   }),
 )
+
+export type MarkdownPreprocessor = (md: string) => string
+
+/** Preprocessors applied to every renderMarkdown call */
+const defaultPipeline: MarkdownPreprocessor[] = [fixLegacyMarkdown, escapeNestedBrackets]
+
+/**
+ * Render markdown to HTML with pre-processing pipeline.
+ * Default preprocessors (e.g. bracket escaping) always run.
+ * Pass additional context-specific preprocessors via the second argument.
+ *
+ * @example
+ *   renderMarkdown(md)                            // article body, summary
+ *   renderMarkdown(md, [rewriteLinksToAppPaths])  // chat (with URL rewriting)
+ */
+export function renderMarkdown(md: string, preprocessors?: MarkdownPreprocessor[]): string {
+  const pipeline = preprocessors
+    ? [...preprocessors, ...defaultPipeline]
+    : defaultPipeline
+  const processed = pipeline.reduce((text, fn) => fn(text), md)
+  return markedInstance.parse(processed) as string
+}

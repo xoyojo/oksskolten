@@ -108,6 +108,43 @@ Displays update frequency and activity level for feeds.
 - Heavy data (average article length) is fetched on demand from `/api/feeds/:id/metrics`
 - Not displayed for clip feeds
 
+### Markdown Rendering
+
+All Markdown-to-HTML rendering goes through `renderMarkdown()` in `src/lib/markdown.ts`. This function applies a preprocessing pipeline before passing the result to `marked` (GFM mode, with `highlight.js` syntax highlighting).
+
+**Pipeline architecture**
+
+```
+renderMarkdown(md, [optional preprocessors])
+  → [...optional, ...default] preprocessors (reduce)
+  → markedInstance.parse()
+```
+
+Each preprocessor is a pure function `(md: string) => string`. The pipeline runs optional (caller-specified) preprocessors first, then the default pipeline.
+
+| Preprocessor | Pipeline | Description |
+|---|---|---|
+| `fixLegacyMarkdown` | Default | Repairs malformed HTML in articles stored before server-side normalization (e.g. `<picture>` → `![](src)`, multi-line link collapsing) |
+| `escapeNestedBrackets` | Default | Escapes `[` `]` inside link text so titles like `[AINews] Title` render correctly |
+| `rewriteLinksToAppPaths` | Optional (chat) | Rewrites external URLs in links to in-app paths |
+
+**Usage by context**
+
+| Context | Call | Files |
+|---|---|---|
+| Article body | `renderMarkdown(md)` | `article-detail.tsx` |
+| Article summary | `renderMarkdown(summary)` | `use-summarize.ts` |
+| Translation preview | `renderMarkdown(text)` | `use-streaming-ai.ts` |
+| Chat messages | `renderMarkdown(md, [rewriteLinksToAppPaths])` | `chat-message-bubble.tsx` |
+
+**Shared utilities**
+
+`walkLinks(s, visitor)` provides bracket-aware markdown link scanning (handles nested brackets, skips image links). Used by both `escapeNestedBrackets` and `rewriteLinksToAppPaths` to avoid duplicated link-parsing logic.
+
+**Implementation files**
+- `src/lib/markdown.ts` — `renderMarkdown`, `walkLinks`, preprocessors, `markedInstance`
+
+
 ### Article List Display Layouts
 
 Four layout options are available for the article list. Independent from the theme (color), allowing free combination.

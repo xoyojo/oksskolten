@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { markedInstance } from '../../lib/markdown'
+import { renderMarkdown, walkLinks } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { SanitizedHTML } from '../ui/sanitized-html'
 import type { ChatMessage } from '../../hooks/use-chat'
@@ -16,10 +16,12 @@ interface ChatMessageBubbleProps {
  * e.g. [title](https://example.com/article) → [title](/example.com/article)
  */
 function rewriteLinksToAppPaths(md: string): string {
-  return md.replace(
-    /\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g,
-    (_match, text, url) => `[${text}](${articleUrlToPath(url)})`,
-  )
+  return walkLinks(md, (text, url) => {
+    if (/^https?:\/\//.test(url)) {
+      return `[${text}](${articleUrlToPath(url)})`
+    }
+    return null
+  })
 }
 
 function formatChatUsage(usage: NonNullable<ChatMessage['usage']>): string {
@@ -34,8 +36,7 @@ function formatChatUsage(usage: NonNullable<ChatMessage['usage']>): string {
 export function ChatMessageBubble({ message, streaming }: ChatMessageBubbleProps) {
   const html = useMemo(() => {
     if (!message.text) return ''
-    const rewritten = rewriteLinksToAppPaths(message.text)
-    return sanitizeHtml(markedInstance.parse(rewritten) as string)
+    return sanitizeHtml(renderMarkdown(message.text, [rewriteLinksToAppPaths]))
   }, [message.text])
 
   if (message.role === 'user') {

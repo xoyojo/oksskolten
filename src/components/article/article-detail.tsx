@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import useSWR from 'swr'
-import { markedInstance, fixLegacyMarkdown } from '../../lib/markdown'
+import { renderMarkdown } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { fetcher, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
@@ -100,9 +100,7 @@ export function ArticleDetail({ articleUrl }: ArticleDetailProps) {
       md = article.full_text || ''
     }
     if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
-    md = fixLegacyMarkdown(md)
-    const html = markedInstance.parse(md) as string
-    return sanitizeHtml(html)
+    return sanitizeHtml(renderMarkdown(md))
   }, [article, viewMode, isUserLang, fullTextTranslated, t])
 
   const { rewrittenHtml: displayContent } = useRewriteInternalLinks(

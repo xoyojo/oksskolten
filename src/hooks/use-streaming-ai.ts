@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { marked } from 'marked'
+import { renderMarkdown } from '../lib/markdown'
 import { sanitizeHtml } from '../lib/sanitize'
 import { streamPost } from '../lib/fetcher'
 import type { useMetrics } from './use-metrics'
@@ -68,7 +68,7 @@ export function useStreamingAI(
       const boldCount = (text.match(/\*\*/g) || []).length
       if (boldCount % 2 !== 0) text += '**'
     }
-    const html = marked.parse(text) as string
+    const html = renderMarkdown(text)
     return sanitizeHtml(html)
   }, [streamingText, options.fixUnclosedBold])
 

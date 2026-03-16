@@ -7,8 +7,8 @@ vi.mock('../lib/fetcher', () => ({
   streamPost: (...args: unknown[]) => mockStreamPost(...args),
 }))
 
-vi.mock('marked', () => ({
-  marked: { parse: (text: string) => `<p>${text}</p>` },
+vi.mock('../lib/markdown', () => ({
+  renderMarkdown: (text: string) => `<p>${text}</p>`,
 }))
 
 vi.mock('../lib/sanitize', () => ({

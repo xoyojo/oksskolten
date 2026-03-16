@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { fixLegacyMarkdown } from './markdown'
+import { fixLegacyMarkdown, escapeNestedBrackets } from './markdown'
 
 describe('fixLegacyMarkdown', () => {
   // --- Pattern 1: markdown link wrapping <picture> ---
@@ -152,5 +152,44 @@ GitHub ModelsManage prompts
   it('leaves regular <img> tags untouched', () => {
     const input = '<img src="photo.jpg" alt="photo">'
     expect(fixLegacyMarkdown(input)).toBe(input)
+  })
+})
+
+describe('escapeNestedBrackets', () => {
+  it('escapes brackets in link text', () => {
+    const input = '[[AINews] Anthropic study](https://example.com)'
+    expect(escapeNestedBrackets(input)).toBe('[\\[AINews\\] Anthropic study](https://example.com)')
+  })
+
+  it('leaves links without brackets untouched', () => {
+    const input = '[Normal title](https://example.com)'
+    expect(escapeNestedBrackets(input)).toBe(input)
+  })
+
+  it('leaves image links untouched', () => {
+    const input = '![alt text](https://example.com/img.jpg)'
+    expect(escapeNestedBrackets(input)).toBe(input)
+  })
+
+  it('handles multiple links with brackets', () => {
+    const input = '- [[AINews] Study A](https://a.com)\n- [[DevOps] Guide B](https://b.com)'
+    expect(escapeNestedBrackets(input)).toBe(
+      '- [\\[AINews\\] Study A](https://a.com)\n- [\\[DevOps\\] Guide B](https://b.com)',
+    )
+  })
+
+  it('does not escape brackets inside fenced code blocks', () => {
+    const input = '```\n[[AINews] Study](https://example.com)\n```'
+    expect(escapeNestedBrackets(input)).toBe(input)
+  })
+
+  it('handles plain text with brackets (not links)', () => {
+    const input = 'This is [just brackets] not a link'
+    expect(escapeNestedBrackets(input)).toBe(input)
+  })
+
+  it('handles deeply nested brackets', () => {
+    const input = '[Title [with [deep] nesting]](https://example.com)'
+    expect(escapeNestedBrackets(input)).toBe('[Title \\[with \\[deep\\] nesting\\]](https://example.com)')
   })
 })

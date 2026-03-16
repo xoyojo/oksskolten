@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { marked } from 'marked'
+import { renderMarkdown } from '../lib/markdown'
 import { sanitizeHtml } from '../lib/sanitize'
 import { useStreamingAI } from './use-streaming-ai'
 import type { useMetrics } from './use-metrics'
@@ -32,7 +32,7 @@ export function useSummarize(
 
   const summaryHtml = useMemo(() => {
     if (!summary) return ''
-    const html = marked.parse(summary) as string
+    const html = renderMarkdown(summary)
     return sanitizeHtml(html)
   }, [summary])
 
