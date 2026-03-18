@@ -1,5 +1,6 @@
 import { useState, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Layers } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import { isReadInSession } from '../../lib/readTracker'
 import { extractDomain, articleUrlToPath } from '../../lib/url'
@@ -171,6 +172,12 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
               </>
             )}
             <span className="shrink-0">{dateText}</span>
+            {(article.similar_count ?? 0) > 0 && (
+              <>
+                <span className="mx-0.5 shrink-0">·</span>
+                <Layers size={12} className="shrink-0 text-muted" />
+              </>
+            )}
           </div>
         </div>
         {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
