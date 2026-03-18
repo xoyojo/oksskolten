@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
 import { useSWRConfig } from 'swr'
@@ -20,6 +20,9 @@ import { toast } from 'sonner'
 import { Mascot } from '../ui/mascot'
 import { FeedErrorBanner } from '../feed/feed-error-banner'
 import { Skeleton } from '../ui/skeleton'
+import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
+import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
+import { apiPatch } from '../../lib/fetcher'
 import type { ArticleListItem, FeedWithCounts } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
 
@@ -42,6 +45,7 @@ export interface ArticleListHandle {
 
 export const ArticleList = forwardRef<ArticleListHandle, object>(function ArticleList(_props, ref) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { feedId: feedIdParam, categoryId: categoryIdParam } = useParams<{ feedId?: string; categoryId?: string }>()
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
@@ -111,6 +115,71 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const hiddenByFloor = data?.[0]?.total_without_floor != null
     ? data[0].total_without_floor - (data[0].total ?? 0)
     : 0
+
+  // ---------------------------------------------------------------------------
+  // Keyboard navigation
+  // ---------------------------------------------------------------------------
+  const { focusedItemId, setFocusedItemId } = useKeyboardNavigationContext()
+  const isKeyboardNavEnabled = !isGridLayout
+
+  const articleIds = useMemo(() => articles.map(a => String(a.id)), [articles])
+
+  const articleMap = useMemo(() => {
+    const map = new Map<string, ArticleListItem>()
+    for (const a of articles) map.set(String(a.id), a)
+    return map
+  }, [articles])
+
+  const isOverlayMode = articleOpenMode === 'overlay'
+  // Track whether overlay was recently closed to prevent Escape from clearing focus
+  const overlayJustClosed = useRef(false)
+
+  useKeyboardNavigation({
+    items: articleIds,
+    focusedItemId,
+    onFocusChange: (id) => {
+      setFocusedItemId(id)
+      overlayJustClosed.current = false
+      const el = document.querySelector(`[data-article-id="${id}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      // Overlay mode: open article immediately on j/k
+      if (isOverlayMode) {
+        const article = articleMap.get(id)
+        if (article) setOverlayUrl(article.url)
+      }
+    },
+    onEnter: isOverlayMode ? undefined : (id) => {
+      // Page mode: Enter to navigate
+      const article = articleMap.get(id)
+      if (article) void navigate(`/${encodeURIComponent(article.url)}`)
+    },
+    onEscape: () => {
+      if (overlayUrl) {
+        setOverlayUrl(null)
+        overlayJustClosed.current = true
+      } else if (overlayJustClosed.current) {
+        // First Escape after closing overlay: do nothing, keep focus
+        overlayJustClosed.current = false
+      } else {
+        setFocusedItemId(null)
+      }
+    },
+    onBookmarkToggle: (id) => {
+      const article = articleMap.get(id)
+      if (!article) return
+      const next = !article.bookmarked_at
+      void apiPatch(`/api/articles/${article.id}/bookmark`, { bookmarked: next })
+        .then(() => {
+          void mutate()
+          void globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds'))
+        })
+    },
+    onOpenExternal: (id) => {
+      const article = articleMap.get(id)
+      if (article?.url) window.open(article.url, '_blank')
+    },
+    enabled: isKeyboardNavEnabled,
+  })
 
   // ---------------------------------------------------------------------------
   // Infinite scroll
@@ -291,15 +360,16 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     }
   }, [feedId, categoryId, flushBatch])
 
-  // Reset autoReadIds, noFloor, and showReadArticles when feed/category changes
+  // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when feed/category changes
   useEffect(() => {
     setAutoReadIds(new Set())
     setNoFloor(false)
     setShowReadArticles(false)
-  }, [feedId, categoryId])
+    setFocusedItemId(null)
+  }, [feedId, categoryId, setFocusedItemId])
 
   return (
-    <main ref={listRef} className="max-w-2xl mx-auto">
+    <main ref={listRef} className="max-w-2xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
       {isTouchDevice && <PullToRefresh onRefresh={async () => {
         if (feedId) {
           const result = await startFeedFetch(feedId)
@@ -386,12 +456,23 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             onClick: handleOverlayOpen,
             ...displayConfig,
           }
+          const isKbFocused = focusedItemId === String(article.id)
           return (
             <div
               key={article.id}
               data-article-id={article.id}
               data-article-unread={article.seen_at == null && !isAutoRead ? '1' : '0'}
+              aria-selected={isKbFocused || undefined}
               className={layout === 'magazine' && index === 0 ? 'col-span-full' : ''}
+              style={isKbFocused ? {
+                borderLeft: '2px solid var(--color-accent)',
+                backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)',
+              } : undefined}
+              onClick={() => {
+                if (!isGridLayout) {
+                  setFocusedItemId(String(article.id))
+                }
+              }}
             >
               {isTouchDevice ? (
                 <SwipeableArticleCard {...cardProps} />
@@ -437,7 +518,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
         </div>
       )}
 
-      <ArticleOverlay articleUrl={overlayUrl} onClose={() => setOverlayUrl(null)} />
+      <ArticleOverlay articleUrl={overlayUrl} onClose={() => { setOverlayUrl(null); overlayJustClosed.current = true }} />
     </main>
   )
 })
