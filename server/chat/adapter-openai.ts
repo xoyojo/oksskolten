@@ -1,6 +1,4 @@
 import type OpenAI from 'openai'
-// Note: OpenAI is imported as type-only for the externalClient parameter signature.
-// The actual OpenAI instance comes from getOpenAIClient() or is passed in externally.
 import type { Message, ContentBlock, TextBlock, ToolUseBlock, ToolResultBlock } from './types.js'
 import { getOpenAIClient } from '../providers/llm/openai.js'
 import { getSetting } from '../db.js'
