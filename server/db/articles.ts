@@ -685,7 +685,7 @@ export function purgeExpiredArticles(readDays: number, unreadDays: number): { pu
     const batch = allIds.slice(i, i + BATCH)
     const placeholders = batch.map(() => '?').join(',')
 
-    // Clean up archived images before nullifying content
+    // Clean up archived images before the transaction (external I/O)
     const articlesWithImages = db.prepare(
       `SELECT id FROM articles WHERE id IN (${placeholders}) AND images_archived_at IS NOT NULL`,
     ).all(...batch) as { id: number }[]
@@ -698,27 +698,30 @@ export function purgeExpiredArticles(readDays: number, unreadDays: number): { pu
       }
     }
 
-    // Soft delete: null out content columns and set purged_at
-    const result = db.prepare(`
-      UPDATE articles
-      SET full_text = NULL,
-          full_text_translated = NULL,
-          excerpt = NULL,
-          summary = NULL,
-          og_image = NULL,
-          images_archived_at = NULL,
-          last_error = NULL,
-          retry_count = 0,
-          purged_at = datetime('now')
-      WHERE id IN (${placeholders})
-    `).run(...batch)
+    // Soft delete + search index removal in a transaction to keep them consistent
+    const result = db.transaction(() => {
+      const res = db.prepare(`
+        UPDATE articles
+        SET full_text = NULL,
+            full_text_translated = NULL,
+            excerpt = NULL,
+            summary = NULL,
+            og_image = NULL,
+            images_archived_at = NULL,
+            last_error = NULL,
+            retry_count = 0,
+            purged_at = datetime('now')
+        WHERE id IN (${placeholders})
+      `).run(...batch)
+
+      for (const id of batch) {
+        deleteArticleFromSearch(id)
+      }
+
+      return res
+    })()
 
     purged += result.changes
-
-    // Remove from search index
-    for (const id of batch) {
-      deleteArticleFromSearch(id)
-    }
   }
 
   return { purged }
