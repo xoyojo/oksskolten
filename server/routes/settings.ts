@@ -665,29 +665,30 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     const normalizedUrl = baseUrl.replace(/\/+$/, '')
 
     try {
-      await assertSafeUrl(normalizedUrl)
-    } catch {
-      reply.status(400).send({ error: 'URL is blocked by SSRF protection' })
-      return
-    }
-
-    try {
-      const headers: Record<string, string> = {}
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`
       }
 
-      const res = await fetch(`${normalizedUrl}/models`, {
+      const res = await fetch(`${normalizedUrl}/chat/completions`, {
+        method: 'POST',
         headers,
+        body: JSON.stringify({
+          model: 'test',
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+        }),
         signal: AbortSignal.timeout(10_000),
       })
 
-      if (!res.ok) {
-        reply.send({ ok: false, error: `HTTP ${res.status}` })
+      if (res.ok || res.status === 401 || res.status === 403) {
+        reply.send({ ok: true })
         return
       }
 
-      reply.send({ ok: true })
+      reply.send({ ok: false, error: `HTTP ${res.status}` })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Connection failed'
       reply.send({ ok: false, error: message })

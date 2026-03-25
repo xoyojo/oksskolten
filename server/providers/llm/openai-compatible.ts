@@ -18,7 +18,7 @@ export function getOpenAICompatibleClient(): OpenAI {
   cachedModel = model
   cachedKey = key
   cachedClient = new OpenAI({
-    baseURL: `${baseUrl}/v1`,
+    baseURL: baseUrl,
     apiKey: key || 'not-needed',
   })
   return cachedClient
