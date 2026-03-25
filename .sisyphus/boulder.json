@@ -1,0 +1,35 @@
+{
+  "active_plan": "/home/xoyo/projects/oksskolten/.sisyphus/plans/openai-compatible-provider.md",
+  "started_at": "2026-03-25T13:42:56.909Z",
+  "session_ids": [
+    "ses_2dadb1ed2ffe57HIRpjqbHo6mN",
+    "ses_2dabd7225ffeyWHZn8DY5Q6Pr7",
+    "ses_2dabd7151ffeJy2ssXspze3dgh",
+    "ses_2dabd7280ffeazdDmMNIozL0bE",
+    "ses_2dabd71c6ffegvRF9ussZ74jFV",
+    "ses_2dab3a2f5ffezUsNERf3HegalJ",
+    "ses_2daa62fa7ffe5LrCATI1ASzYHE"
+  ],
+  "plan_name": "openai-compatible-provider",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Create OpenAI Compatible Provider Backend",
+      "session_id": "ses_2dabd7280ffeazdDmMNIozL0bE",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-03-25T13:53:03.469Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "Create OpenAICompatibleCard Component",
+      "session_id": "ses_2daa62fa7ffe5LrCATI1ASzYHE",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-03-25T14:38:17.492Z"
+    }
+  }
+}

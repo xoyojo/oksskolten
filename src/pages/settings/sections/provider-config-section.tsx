@@ -21,6 +21,7 @@ export function ProviderConfigSection({ t, settings }: { t: TFunc; settings: Set
           ))}
           <ClaudeCodeCard t={t} />
           <OllamaCard t={t} />
+          <OpenAICompatibleCard t={t} />
         </div>
       </div>
       <div>
@@ -430,6 +431,172 @@ function OllamaCard({ t }: { t: TFunc }) {
             {testResult.ok
               ? `${t('ollama.connected')} (v${testResult.version}, ${testResult.model_count} models)`
               : `${t('ollama.connectionFailed')}: ${testResult.error}`}
+          </span>
+        )}
+      </div>
+
+      {message && (
+        <p className={`text-xs ${message.type === 'error' ? 'text-error' : 'text-accent'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function OpenAICompatibleCard({ t }: { t: TFunc }) {
+  const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
+    '/api/settings/preferences',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+  const { data: keyStatus, mutate: mutateKeyStatus } = useSWR<{ configured: boolean }>(
+    '/api/settings/api-keys/openai-compatible',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const savedBaseUrl = prefs?.['openai-compatible.base_url'] || ''
+  const savedModel = prefs?.['openai-compatible.model'] || ''
+  const [baseUrlInput, setBaseUrlInput] = useState('')
+  const [modelNameInput, setModelNameInput] = useState('')
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [savingKey, setSavingKey] = useState(false)
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
+
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (!prefs || initialized) return
+    setBaseUrlInput(prefs['openai-compatible.base_url'] || '')
+    setModelNameInput(prefs['openai-compatible.model'] || '')
+    setInitialized(true)
+  }, [prefs, initialized])
+
+  function showMessage(text: string, type: 'success' | 'error') {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  const handleSave = useCallback(async () => {
+    if (saving) return
+    setSaving(true)
+    try {
+      await apiPatch('/api/settings/preferences', {
+        'openai-compatible.base_url': baseUrlInput || '',
+        'openai-compatible.model': modelNameInput || '',
+      })
+      void mutatePrefs()
+      showMessage(t('settings.saved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }, [saving, baseUrlInput, modelNameInput, mutatePrefs, t])
+
+  const handleApiKeySave = useCallback(async () => {
+    if (savingKey) return
+    setSavingKey(true)
+    try {
+      await apiPost('/api/settings/api-keys/openai-compatible', { apiKey: apiKeyInput })
+      void mutateKeyStatus()
+      setApiKeyInput('')
+      showMessage(t('chat.apiKeySaved'), 'success')
+    } catch (err: unknown) {
+      showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
+    } finally {
+      setSavingKey(false)
+    }
+  }, [savingKey, apiKeyInput, mutateKeyStatus, t])
+
+  const handleTest = useCallback(async () => {
+    if (testing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await fetcher('/api/settings/openai-compatible/status') as { ok: boolean; error?: string }
+      setTestResult(res)
+    } catch {
+      setTestResult({ ok: false, error: 'Request failed' })
+    } finally {
+      setTesting(false)
+    }
+  }, [testing])
+
+  const hasChanges = baseUrlInput !== savedBaseUrl || modelNameInput !== savedModel
+
+  return (
+    <div className="p-3 rounded-lg bg-bg-card border border-border min-h-[3rem] space-y-2">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${testResult?.ok ? 'bg-success' : savedBaseUrl && savedModel ? 'bg-warning' : 'bg-muted'}`} />
+        <span className="text-sm font-medium text-text select-none">{t('provider.openaiCompatible')}</span>
+      </div>
+
+      <FormField label={t('openaiCompatible.baseUrl')} hint={t('openaiCompatible.baseUrlDesc')} compact>
+        <Input
+          type="text"
+          value={baseUrlInput}
+          onChange={e => setBaseUrlInput(e.target.value)}
+          placeholder={t('openaiCompatible.baseUrlPlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('openaiCompatible.modelName')} hint={t('openaiCompatible.modelNameDesc')} compact>
+        <Input
+          type="text"
+          value={modelNameInput}
+          onChange={e => setModelNameInput(e.target.value)}
+          placeholder={t('openaiCompatible.modelNamePlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <FormField label={t('openaiCompatible.apiKey')} hint={t('openaiCompatible.apiKeyPlaceholder')} compact>
+        <Input
+          type="password"
+          value={apiKeyInput}
+          onChange={e => setApiKeyInput(e.target.value)}
+          placeholder={keyStatus?.configured ? '********' : t('openaiCompatible.apiKeyPlaceholder')}
+          className="py-1.5"
+        />
+      </FormField>
+
+      <div className="flex items-center gap-2">
+        {hasChanges && (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+          >
+            {saving ? '...' : t('settings.save')}
+          </button>
+        )}
+        {apiKeyInput && (
+          <button
+            type="button"
+            onClick={handleApiKeySave}
+            disabled={savingKey}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-accent-text hover:opacity-90 transition-opacity disabled:opacity-50 select-none shrink-0"
+          >
+            {savingKey ? '...' : t('settings.save')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleTest}
+          disabled={testing}
+          className="px-3 py-1.5 text-xs rounded-lg border border-border text-muted hover:text-text hover:bg-hover transition-colors disabled:opacity-50 select-none"
+        >
+          {testing ? t('openaiCompatible.testing') : t('openaiCompatible.testConnection')}
+        </button>
+        {testResult && (
+          <span className={`text-xs ${testResult.ok ? 'text-accent' : 'text-error'}`}>
+            {testResult.ok ? t('openaiCompatible.connected') : `${t('openaiCompatible.connectionFailed')}: ${testResult.error}`}
           </span>
         )}
       </div>

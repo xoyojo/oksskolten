@@ -69,6 +69,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
   ollama: '',
   'google-translate': '',
   deepl: '',
+  'openai-compatible': '',
 }
 
 export const TASK_DEFAULTS = {
@@ -84,9 +85,9 @@ export const LLM_API_PROVIDERS = ['anthropic', 'gemini', 'openai'] as const
 export const TRANSLATE_SERVICE_PROVIDERS = ['google-translate', 'deepl'] as const
 
 /** All LLM providers selectable for tasks (includes claude-code which uses auth, not API key) */
-export const LLM_TASK_PROVIDERS = [...LLM_API_PROVIDERS, 'claude-code', 'ollama'] as const
+export const LLM_TASK_PROVIDERS = [...LLM_API_PROVIDERS, 'claude-code', 'ollama', 'openai-compatible'] as const
 
-export const PROVIDER_LABELS: Record<string, 'provider.anthropic' | 'provider.gemini' | 'provider.openai' | 'provider.claudeCode' | 'provider.ollama' | 'provider.googleTranslate' | 'provider.deepl'> = {
+export const PROVIDER_LABELS: Record<string, 'provider.anthropic' | 'provider.gemini' | 'provider.openai' | 'provider.claudeCode' | 'provider.ollama' | 'provider.googleTranslate' | 'provider.deepl' | 'provider.openaiCompatible'> = {
   anthropic: 'provider.anthropic',
   gemini: 'provider.gemini',
   openai: 'provider.openai',
@@ -94,6 +95,7 @@ export const PROVIDER_LABELS: Record<string, 'provider.anthropic' | 'provider.ge
   ollama: 'provider.ollama',
   'google-translate': 'provider.googleTranslate',
   deepl: 'provider.deepl',
+  'openai-compatible': 'provider.openaiCompatible',
 }
 
 /** Cheapest model per provider, used for lightweight sub-agent tasks (e.g. title generation) */

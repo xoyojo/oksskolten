@@ -51,6 +51,8 @@ const PREF_KEYS = [
   'translate.target_lang',
   'ollama.base_url',
   'ollama.custom_headers',
+  'openai-compatible.model',
+  'openai-compatible.base_url',
   'custom_themes',
   'retention.enabled',
   'retention.read_days',
@@ -84,6 +86,8 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'translate.target_lang': ['ja', 'en'],
   'ollama.base_url': null,
   'ollama.custom_headers': null,
+  'openai-compatible.model': null,
+  'openai-compatible.base_url': null,
   'custom_themes': null,
   'retention.enabled': ['on', 'off'],
   'retention.read_days': null,
@@ -555,6 +559,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     anthropic: 'api_key.anthropic',
     gemini: 'api_key.gemini',
     openai: 'api_key.openai',
+    'openai-compatible': 'api_key.openai-compatible',
     'google-translate': 'api_key.google_translate',
     deepl: 'api_key.deepl',
   }
@@ -641,6 +646,48 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
         version: versionData.version || 'unknown',
         model_count: tagsData.models?.length || 0,
       })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      reply.send({ ok: false, error: message })
+    }
+  })
+
+  // --- OpenAI-compatible endpoints ---
+
+  api.get('/api/settings/openai-compatible/status', async (_request, reply) => {
+    const baseUrl = getSetting('openai-compatible.base_url')
+    if (!baseUrl) {
+      reply.send({ ok: false, error: 'Base URL is not configured' })
+      return
+    }
+
+    const apiKey = getSetting('api_key.openai-compatible')
+    const normalizedUrl = baseUrl.replace(/\/+$/, '')
+
+    try {
+      await assertSafeUrl(normalizedUrl)
+    } catch {
+      reply.status(400).send({ error: 'URL is blocked by SSRF protection' })
+      return
+    }
+
+    try {
+      const headers: Record<string, string> = {}
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`
+      }
+
+      const res = await fetch(`${normalizedUrl}/models`, {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      })
+
+      if (!res.ok) {
+        reply.send({ ok: false, error: `HTTP ${res.status}` })
+        return
+      }
+
+      reply.send({ ok: true })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Connection failed'
       reply.send({ ok: false, error: message })
