@@ -38,6 +38,7 @@ export function ProviderConfigSection({ t, settings }: { t: TFunc; settings: Set
           <div className="flex rounded-md bg-bg-subtle p-0.5">
             {([
               { value: '', label: t('settings.translateTargetLangAuto') },
+              { value: 'zh', label: t('settings.languageZh') },
               { value: 'ja', label: t('settings.languageJa') },
               { value: 'en', label: t('settings.languageEn') },
             ] as const).map(opt => (

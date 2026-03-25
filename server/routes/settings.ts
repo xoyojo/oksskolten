@@ -83,7 +83,7 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'summary.model': getAllModelValues(),
   'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'openai-compatible', 'google-translate', 'deepl'],
   'translate.model': getAllModelValues(),
-  'translate.target_lang': ['ja', 'en'],
+  'translate.target_lang': ['zh', 'ja', 'en'],
   'ollama.base_url': null,
   'ollama.custom_headers': null,
   'openai-compatible.model': null,

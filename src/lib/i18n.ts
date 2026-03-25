@@ -325,6 +325,7 @@ const dict = {
   'settings.languageDesc': { ja: 'UIの表示言語', en: 'Display language for UI' },
   'settings.languageJa': { ja: '日本語', en: 'Japanese' },
   'settings.languageEn': { ja: '英語', en: 'English' },
+  'settings.languageZh': { ja: '中国語', en: 'Chinese' },
 
   // Translation target language
   'settings.translateTargetLang': { ja: '翻訳先言語', en: 'Translation language' },
